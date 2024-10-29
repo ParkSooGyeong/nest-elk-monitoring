@@ -22,6 +22,10 @@ import { DepositService } from './services/deposit.service';
 import { WithdrawalService } from './services/withdrawal.service';
 import { TransactionsController } from './controllers/transactions.controller';
 import { DepositController } from './controllers/deposit.controller';
+import { StoreService } from './services/store.service';
+import { StoreController } from './controllers/store.controller';
+import { ProductService } from './services/product.service';
+import { ProductController } from './controllers/product.controller';
 
 @Module({
   imports: [
@@ -44,7 +48,7 @@ import { DepositController } from './controllers/deposit.controller';
     AuthModule,
     LoggingModule, // 전역 모듈로 추가
   ],
-  controllers: [UserController, TransactionsController, DepositController],
+  controllers: [UserController, TransactionsController, DepositController, StoreController, ProductController],
   providers: [
     EmailAlertService,
     MetricsService,
@@ -53,6 +57,8 @@ import { DepositController } from './controllers/deposit.controller';
     JwtService,
     DepositService,
     WithdrawalService,
+    StoreService,
+    ProductService
   ],
 })
 export class AppModule implements NestModule {
