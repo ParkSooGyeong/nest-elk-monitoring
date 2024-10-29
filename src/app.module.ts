@@ -1,7 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { LoggingController } from './controllers/logging.controller';
 import { LoggingModule } from './module/logging.module';
 import { EmailAlertService } from './services/email-alert.service';
 import { MetricsService } from './services/metrics.service';
@@ -22,6 +21,7 @@ import { AuthModule } from './module/auth.module';
 import { DepositService } from './services/deposit.service';
 import { WithdrawalService } from './services/withdrawal.service';
 import { TransactionsController } from './controllers/transactions.controller';
+import { DepositController } from './controllers/deposit.controller';
 
 @Module({
   imports: [
@@ -44,7 +44,7 @@ import { TransactionsController } from './controllers/transactions.controller';
     AuthModule,
     LoggingModule, // 전역 모듈로 추가
   ],
-  controllers: [LoggingController, UserController, TransactionsController],
+  controllers: [UserController, TransactionsController, DepositController],
   providers: [
     EmailAlertService,
     MetricsService,

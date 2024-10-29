@@ -24,10 +24,11 @@ export class DepositService {
   async createDeposit(userId: number, amount: number, date: string): Promise<Deposit> {
     try {
       // 사용자 정보 가져오기
-      const user = await this.userRepository.findOne({ where: { id: userId } });
+      const user = await this.userRepository.findOne({ where: { id: userId }, relations: ['balance'] });
       if (!user) {
         throw new Error('사용자를 찾을 수 없습니다.');
       }
+
       // 입금 정보를 저장
       const deposit = this.depositRepository.create({ user, amount, date });
       await this.depositRepository.save(deposit);
@@ -40,6 +41,7 @@ export class DepositService {
         throw new Error('사용자의 잔액을 찾을 수 없습니다.');
       }
 
+      await this.loggingService.logInfo(`Deposit created for userId: ${userId}, Amount: ${amount}`);
       return deposit;
     } catch (error) {
       await this.loggingService.logError(`Deposit creation failed for userId ${userId}: ${error.message}`);

@@ -18,7 +18,7 @@ export class DatabaseService {
       return await this.userRepository.save(user);
     } catch (error) {
       await this.loggingService.logError(`Failed to create user: ${error.message}`);
-      throw error; // 오류를 다시 던져 호출자에게 알림
+      throw error;
     }
   }
 
@@ -27,7 +27,7 @@ export class DatabaseService {
       return await this.authRepository.save(auth);
     } catch (error) {
       await this.loggingService.logError(`Failed to create auth: ${error.message}`);
-      throw error; // 오류를 다시 던져 호출자에게 알림
+      throw error;
     }
   }
 }

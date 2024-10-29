@@ -3,10 +3,12 @@ import { createLogger, format, transports } from 'winston';
 import { Gauge, register } from 'prom-client';
 import { Client } from '@elastic/elasticsearch';
 
+// p-retry 사용이 안됨 동적임포트도 안되어서 새로운 라이브러리 교체
+import pRetry from '@fullstax/p-retry';
+
 @Injectable()
 export class LoggingService {
   private logCountGauge: Gauge<string>;
-
   private elasticClient = new Client({ node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200' });
 
   private logger = createLogger({
@@ -40,7 +42,6 @@ export class LoggingService {
     this.logCountGauge.set(0);
   }
 
-  // 로그 기록 메서드들
   async logInfo(message: string) {
     this.logger.info(message);
     this.logCountGauge.inc({ level: 'info' });
@@ -65,7 +66,6 @@ export class LoggingService {
     await this.logToElk('debug', message);
   }
 
-  // Elasticsearch에 로그 저장
   private async logToElk(level: string, message: string) {
     const logOperation = async () => {
       await this.elasticClient.index({
@@ -79,7 +79,7 @@ export class LoggingService {
     };
 
     try {
-      const pRetry = (await import('p-retry')).default; // 오류 계속 생겨서 동적 import 사용
+      // @fullstax/p-retry 사용
       await pRetry(logOperation, {
         retries: 3, // 3번 재시도
         onFailedAttempt: (error) => {
