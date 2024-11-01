@@ -36,7 +36,11 @@ export class ProductController {
     @Res() res: Response,
   ) {
     try {
+      console.log('Received products:', products);
+
+      // 체크 1: products의 길이 확인
       if (products.length > 5) {
+        console.warn('Too many products. Limiting to 5.');
         await this.loggingService.logWarning(
           `Product creation failed: More than 5 products attempted`,
         );
@@ -45,10 +49,21 @@ export class ProductController {
           .json({ message: '한 번에 최대 5개의 물품만 등록 가능합니다.' });
       }
 
-      const userId = req['user'].userId;
-      const store = await this.storeService.findByUserId(userId);
+      // 체크 2: 사용자 ID 확인
+      const userId = req['user']?.userId;
+      console.log('User ID from request:', userId);
+      if (!userId) {
+        console.error('User ID not found in request');
+        return res
+          .status(401)
+          .json({ message: '사용자 인증 정보가 필요합니다.' });
+      }
 
+      // 체크 3: 스토어 확인
+      const store = await this.storeService.findByUserId(userId);
+      console.log('Store found for user ID:', store);
       if (!store) {
+        console.warn(`No store found for userId: ${userId}`);
         await this.loggingService.logWarning(
           `Product creation failed: Store not found for userId: ${userId}`,
         );
@@ -57,14 +72,18 @@ export class ProductController {
           .json({ message: `스토어를 찾을 수 없습니다. (userId: ${userId})` });
       }
 
-      // storeId를 각 product에 추가
+      // 체크 4: store 객체 추가한 product 리스트 생성
       const productsWithStore = products.map((product) => ({
         ...product,
-        storeId: store.id,
+        store,
       }));
+      console.log('Products with store information:', productsWithStore);
 
+      // 체크 5: ProductService를 사용해 물품 생성
       const createdProducts = await this.productService.createProducts(productsWithStore);
+      console.log('Created products:', createdProducts);
 
+      // 체크 6: 성공 로그 기록 및 응답
       await this.loggingService.logInfo(
         `Products created successfully for userId: ${userId}`,
       );
@@ -73,6 +92,7 @@ export class ProductController {
         products: createdProducts,
       });
     } catch (error) {
+      console.error('Error occurred during product creation:', error);
       await this.loggingService.logError(
         `Product creation failed: ${error.message}`,
       );

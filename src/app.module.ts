@@ -26,6 +26,9 @@ import { StoreService } from './services/store.service';
 import { StoreController } from './controllers/store.controller';
 import { ProductService } from './services/product.service';
 import { ProductController } from './controllers/product.controller';
+import { Shipping } from './models/shipping.entity';
+import { PurchasesController } from './controllers/purchases.controller';
+import { PurchaseService } from './services/purchase.service'; 
 
 @Module({
   imports: [
@@ -40,15 +43,15 @@ import { ProductController } from './controllers/product.controller';
       username: process.env.DB_USERNAME || 'root',
       password: process.env.DB_PASSWORD || 'password',
       database: process.env.DB_NAME || 'elk',
-      entities: [User, Auth, Deposit, Withdrawal, Balance, Transaction, Store, Product],
+      entities: [User, Auth, Deposit, Withdrawal, Balance, Transaction, Store, Product, Shipping],
       synchronize: false,
     }),
 
-    TypeOrmModule.forFeature([User, Auth, Deposit, Withdrawal, Balance, Transaction, Store, Product]),
+    TypeOrmModule.forFeature([User, Auth, Deposit, Withdrawal, Balance, Transaction, Store, Product, Shipping]),
     AuthModule,
     LoggingModule, // 전역 모듈로 추가
   ],
-  controllers: [UserController, TransactionsController, DepositController, StoreController, ProductController],
+  controllers: [UserController, TransactionsController, DepositController, StoreController, ProductController, PurchasesController],
   providers: [
     EmailAlertService,
     MetricsService,
@@ -58,7 +61,8 @@ import { ProductController } from './controllers/product.controller';
     DepositService,
     WithdrawalService,
     StoreService,
-    ProductService
+    ProductService,
+    PurchaseService
   ],
 })
 export class AppModule implements NestModule {
