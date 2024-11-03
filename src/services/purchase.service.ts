@@ -8,6 +8,7 @@ import { Product } from '../models/products.entity';
 import { Shipping } from '../models/shipping.entity';
 import { EmailAlertService } from './email-alert.service';
 import { LoggingService } from './logging.service';
+import { TransactionType } from '../models/transaction.entity'
 
 @Injectable()
 export class PurchaseService {
@@ -30,7 +31,6 @@ export class PurchaseService {
     private readonly loggingService: LoggingService,
     private readonly emailAlertService: EmailAlertService,
   ) {}
-
   async purchaseProduct(email: string, productId: number, quantity: number): Promise<{ message: string }> {
     try {
       // 구매자 정보 가져오기
@@ -75,7 +75,7 @@ export class PurchaseService {
       const transaction = this.transactionRepository.create({
         user,
         amount,
-        type: 'PAYMENT',
+        type: TransactionType.PAYMENT,
         date: new Date().toISOString().slice(0, 10),
       });
       await this.transactionRepository.save(transaction);
@@ -119,7 +119,6 @@ export class PurchaseService {
     try {
       // 판매자 정보 가져오기
       const seller = await this.userRepository.findOne({ where: { email } });
-      console.log(seller, '판매자 이메일')
       if (!seller) {
         const errorMessage = `판매자를 찾을 수 없습니다. (이메일: ${email || '없음'})`;
         await this.loggingService.logError(`Shipping update failed for email ${email}: ${errorMessage}`);
@@ -152,11 +151,11 @@ export class PurchaseService {
       }
   
       // 배송 상태 업데이트 및 운송장 정보 추가
-      shipping.status = 'READY';
+      shipping.status = 'SHIPPED';
       shipping.courierName = courierName;
       shipping.trackingNumber = trackingNumber;
       await this.shippingRepository.save(shipping);
-      await this.loggingService.logInfo(`Shipping status updated to IN_TRANSIT for shippingId ${shippingId}, courier: ${courierName}, trackingNumber: ${trackingNumber}`);
+      await this.loggingService.logInfo(`Shipping status updated to SHIPPED for shippingId ${shippingId}, courier: ${courierName}, trackingNumber: ${trackingNumber}`);
   
       // 구매자에게 배송 중 이메일 전송
       if (shipping.buyer && shipping.buyer.email) {
@@ -178,5 +177,74 @@ export class PurchaseService {
       await this.loggingService.logError(`Unexpected error during shipping update for email ${email || 'undefined'}: ${error.message}`);
       throw error;
     }
-  }   
+  }
+
+  async confirmPurchase(email: string, shippingId: number): Promise<{ message: string }> {
+    try {
+      // 구매자 정보 가져오기
+      const buyer = await this.userRepository.findOne({ where: { email }, relations: ['balance'] });
+      if (!buyer) {
+        const errorMessage = '구매자를 찾을 수 없습니다.';
+        await this.loggingService.logError(`Confirm purchase failed for email ${email}: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+
+      // 배송 정보 가져오기
+      const shipping = await this.shippingRepository.findOne({
+        where: { id: shippingId },
+        relations: ['product', 'product.store', 'product.store.user'],
+      });
+      if (!shipping) {
+        const errorMessage = `배송 정보를 찾을 수 없습니다. (배송 ID: ${shippingId})`;
+        await this.loggingService.logError(`Confirm purchase failed for shippingId ${shippingId}: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+
+      // 배송 상태가 "배송중"인지 확인
+      if (shipping.status !== 'SHIPPED') {
+        const errorMessage = '배송 상태가 "배송중"이 아니어서 구매 확인을 할 수 없습니다.';
+        await this.loggingService.logError(`Confirm purchase failed for shippingId ${shippingId}: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+
+      // 판매자 정보 가져오기
+      const seller = shipping.product.store.user;
+      if (!seller) {
+        const errorMessage = '판매자를 찾을 수 없습니다.';
+        await this.loggingService.logError(`Confirm purchase failed for shippingId ${shippingId}: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+
+      // 판매자 잔액 업데이트 및 정규화
+      let sellerBalance = await this.balanceRepository.findOne({ where: { user: seller } });
+      if (!sellerBalance) {
+        // 판매자의 잔액 정보가 없으면 생성
+        sellerBalance = this.balanceRepository.create({ user: seller, balance: 0 });
+      }
+      sellerBalance.balance = parseFloat(sellerBalance.balance.toString()) + parseFloat(shipping.product.price.toString());
+      await this.balanceRepository.save(sellerBalance);
+      await this.loggingService.logInfo(`Balance updated for seller ${seller.email}. New balance: ${sellerBalance.balance}`);
+
+      // 거래 내역 추가 (판매로 인한 금액 증가)
+      const transaction = this.transactionRepository.create({
+        user: seller,
+        amount: shipping.product.price,
+        type: TransactionType.RECEIPT, 
+        date: new Date().toISOString().slice(0, 10),
+      });
+      await this.transactionRepository.save(transaction);
+      await this.transactionRepository.save(transaction);
+      await this.loggingService.logInfo(`Transaction recorded for seller ${seller.email}. Amount added: ${shipping.product.price}`);
+
+      // 배송 상태 "배송 완료"로 업데이트
+      shipping.status = 'COMPLETED';
+      await this.shippingRepository.save(shipping);
+      await this.loggingService.logInfo(`Shipping status updated to COMPLETED for shippingId ${shippingId}`);
+
+      return { message: '구매 확인이 완료되었습니다.' };
+    } catch (error) {
+      await this.loggingService.logError(`Unexpected error during confirm purchase for email ${email || 'undefined'}: ${error.message}`);
+      throw error;
+    }
+  }
 }

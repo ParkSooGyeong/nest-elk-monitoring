@@ -14,7 +14,7 @@ export class Shipping {
   trackingNumber: string; // 운송장 번호
 
   @Column({ length: 20, default: 'PENDING' })
-  status: string; // 배송 상태 (예: 'PENDING', 'READY', 'SHIPPED' 등)
+  status: string; // 배송 상태 (예: 'PENDING', 'READY', 'SHIPPED', 'COMPLETED')
 
   @ManyToOne(() => Product)
   @JoinColumn({ name: 'productId' })

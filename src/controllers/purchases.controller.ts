@@ -37,4 +37,18 @@ export class PurchasesController {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('confirm')
+  async confirmPurchase(
+    @Req() req: Request,
+    @Body('shippingId') shippingId: number,
+  ) {
+    try {
+      const userEmail = req['user'].email;
+      return await this.purchaseService.confirmPurchase(userEmail, shippingId);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
 }
