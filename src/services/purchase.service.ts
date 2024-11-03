@@ -107,11 +107,76 @@ export class PurchaseService {
         product.name
       );
       await this.loggingService.logInfo(`Shipping request email sent to seller ${seller.email} for product ${product.name}`);
-      console.log(user, seller)
+      
       return { message: '상품 구매가 완료되었습니다.' };
     } catch (error) {
       await this.loggingService.logError(`Unexpected error during purchase for email ${email}: ${error}`);
       throw error;
     }
   }
+
+  async updateShippingStatus(email: string, shippingId: number, courierName: string, trackingNumber: string): Promise<{ message: string }> {
+    try {
+      // 판매자 정보 가져오기
+      const seller = await this.userRepository.findOne({ where: { email } });
+      console.log(seller, '판매자 이메일')
+      if (!seller) {
+        const errorMessage = `판매자를 찾을 수 없습니다. (이메일: ${email || '없음'})`;
+        await this.loggingService.logError(`Shipping update failed for email ${email}: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+  
+      // 배송 정보 가져오기
+      const shipping = await this.shippingRepository.findOne({
+        where: { id: shippingId },
+        relations: ['product', 'product.store', 'product.store.user', 'buyer'],
+      });
+  
+      if (!shipping) {
+        const errorMessage = `배송 정보를 찾을 수 없습니다. (배송 ID: ${shippingId})`;
+        await this.loggingService.logError(`Shipping update failed for shippingId ${shippingId}: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+  
+      if (!shipping.product.store || !shipping.product.store.user) {
+        const errorMessage = '배송의 판매자 정보를 찾을 수 없습니다.';
+        await this.loggingService.logError(`Shipping update failed for shippingId ${shippingId}: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+  
+      // 판매자 확인 (판매자 정보가 일치하는지 체크)
+      if (shipping.product.store.user.id !== seller.id) {
+        const errorMessage = `판매자 권한이 없습니다. 배송 상태를 업데이트할 권한이 없습니다. (판매자 이메일: ${seller.email})`;
+        await this.loggingService.logError(`Shipping update failed for shippingId ${shippingId}: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+  
+      // 배송 상태 업데이트 및 운송장 정보 추가
+      shipping.status = 'READY';
+      shipping.courierName = courierName;
+      shipping.trackingNumber = trackingNumber;
+      await this.shippingRepository.save(shipping);
+      await this.loggingService.logInfo(`Shipping status updated to IN_TRANSIT for shippingId ${shippingId}, courier: ${courierName}, trackingNumber: ${trackingNumber}`);
+  
+      // 구매자에게 배송 중 이메일 전송
+      if (shipping.buyer && shipping.buyer.email) {
+        await this.emailAlertService.sendShippingInTransitNotification(
+          shipping.buyer.email,
+          shipping.buyer.name,
+          shipping.product.name,
+          courierName,
+          trackingNumber
+        );
+        await this.loggingService.logInfo(`Shipping in transit email sent to buyer ${shipping.buyer.email} for product ${shipping.product.name}`);
+      } else {
+        const errorMessage = '구매자 정보를 찾을 수 없어 이메일을 보낼 수 없습니다.';
+        await this.loggingService.logWarning(`Shipping update succeeded but failed to send email for shippingId ${shippingId}: ${errorMessage}`);
+      }
+  
+      return { message: '배송 상태가 "배송중"으로 업데이트되었습니다.' };
+    } catch (error) {
+      await this.loggingService.logError(`Unexpected error during shipping update for email ${email || 'undefined'}: ${error.message}`);
+      throw error;
+    }
+  }   
 }

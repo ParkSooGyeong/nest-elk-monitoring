@@ -44,4 +44,20 @@ export class EmailAlertService {
 
     await this.transporter.sendMail(mailOptions);
   }
+
+  // 구매자에게 배송 중 알림
+  async sendShippingInTransitNotification(buyerEmail: string, buyerName: string, productName: string, courierName: string, trackingNumber: string) {
+    // src/templates 경로로 직접 설정
+    const templatePath = join(process.cwd(), 'src', 'templates', 'shipping-in-transit.ejs');
+    const emailHtml = await ejs.renderFile(templatePath, { buyerName, productName, courierName, trackingNumber });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: buyerEmail,
+      subject: '배송이 시작되었습니다.',
+      html: emailHtml,
+    };
+
+    await this.transporter.sendMail(mailOptions);
+  }
 }
